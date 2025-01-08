@@ -110,6 +110,12 @@ class SpreadStrategy:
             pivot_data[name+ ' - Spread'] = pivot_data[name+ " - Near Term"] - pivot_data[name+" - Long Term"]
         return pivot_data.dropna()
 
+    def set_up_dataframe(self):
+        """Calculate the spread (near term - long term) over time."""
+        data = self.data_module.data
+        pivot_data = data.pivot(index=self.time_column, columns=self.contract_column, values=self.price_column)
+        return pivot_data.dropna()
+
     def compute_statistics(self, spread_data):
         """Calculate required statistics for the strategy."""
         # Spread returns
