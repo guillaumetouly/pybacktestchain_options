@@ -214,18 +214,8 @@ class CommoBroker:
                 continue
 
             # Determine the quantity to trade based on the target spread
-            if True:
-                self.update_pos(commodity, 1, 1, long_term_spread[1], long_term_spread[0], date)
-            elif short_term_spread < long_term_spread:
-                print("I BUY SPREAD")
-                print("CASH BEFORE BUYING IS ", self.cash)
-                self.buy_st_spread(commodity, near_qty=1, long_qty=1, st_spread=short_term_spread,lt_spread=long_term_spread, date=date)
-                print("CASH AFTER BUYING IS ", self.cash)
-            elif short_term_spread > long_term_spread:
-                print("I SELL SPREAD")
-                print("CASH BEFORE BUYING IS ", self.cash)
-                self.sell_st_spread(commodity, near_qty=1, long_qty=1, st_spread=short_term_spread, lt_spread=long_term_spread, date=date)
-                print("CASH AFTER BUYING IS ", self.cash)
+            self.update_pos(commodity, 1, 1, long_term_spread[1], long_term_spread[0], date)
+            
 
 
 @dataclass
