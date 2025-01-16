@@ -1,8 +1,7 @@
 from flask import Flask, request, jsonify
 from datetime import datetime
-from universal_backtest import UniversalBackTest  # Remplacez "your_module" par le nom de votre fichier contenant UniversalBackTest
+from universal_backtest import UniversalBackTest  
 
-# Créer l'application Flask
 app = Flask(__name__)
 
 @app.route('/run_backtest', methods=['POST'])
