@@ -165,26 +165,28 @@ class CommoBroker:
             current_spread = market_spreads.get(commodity)
             print(current_spread)
             if current_spread is not None:
-                portfolio_value +=   (current_spread[0]*position.near_term_quantity + current_spread[1]*position.long_term_quantity)
+                portfolio_value += (current_spread[0]*position.near_term_quantity + current_spread[1]*position.long_term_quantity)
         return portfolio_value
 
-    def execute_spread_strategy(self, long_term, short_term, date):
+    def execute_spread_strategy(self, spread_items, short_term, date):
         """Executes the trades for the spread strategy.
             """
         
-        for commodity, long_term_spread in long_term.items():
-            #short_term_spread = short_term[commodity]
-            short_term_spread = 1
-            if  long_term_spread == [{}, {}]:
+        for commodity, spreads in spread_items.items():
+            if  spreads == [{}, {}]:
                 if self.verbose:
                     logging.warning(f"Spread for {commodity} not available on {date}")
                 continue
-            if short_term_spread is None :
+            if spreads[1] is None :
                 if self.verbose:
-                    logging.warning(f"Spread for {commodity} not available on {date}")
+                    logging.warning(f"ST Spread for {commodity} not available on {date}")
+                continue
+            if spreads[0] is None :
+                if self.verbose:
+                    logging.warning(f"LT Spread for {commodity} not available on {date}")
                 continue
 
-            self.update_pos(commodity, 1, 1, long_term_spread[1], long_term_spread[0], date)
+            self.update_pos(commodity, 1, 1, spreads[1], spreads[0], date)
             
 
 
