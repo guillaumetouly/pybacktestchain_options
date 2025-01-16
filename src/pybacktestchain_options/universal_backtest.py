@@ -34,7 +34,7 @@ class UniversalBackTest():
 
     def __post_init__(self):
         self.backtest_name = generate_random_name()
-
+        
     def define_backtest(self):
         if self.commo_equity == "EQUITY":
             self.broker = Broker(cash=self.initial_cash, verbose=self.verbose)
@@ -61,7 +61,8 @@ class UniversalBackTest():
                                      self.final_date,
                                      self.commodity_pairs,
                                      self.cash,
-                                     self.verbose)
+                                     self.verbose,
+                                     self.backtest_name)
 
         else:
             pass

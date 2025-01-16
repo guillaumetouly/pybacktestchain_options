@@ -9,9 +9,9 @@ from dataclasses import dataclass
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 
-#---------------------------------------------------------
-# Commodity Ticker Pairs
-#---------------------------------------------------------
+###########################
+####### FIXED DATA #######
+##########################
 
 COMMODITY_TICKER_PAIRS = {
     "OIL": {"Near Term": "CL=F", "Long Term": "CLM24.NYM"},  # Crude Oil
@@ -22,10 +22,9 @@ COMMODITY_TICKER_PAIRS = {
     "CORN": {"Near Term": "ZC=F", "Long Term": "ZCN24.CBT"}  # Corn
 }
 
-#---------------------------------------------------------
-# Functions
-#---------------------------------------------------------
-
+##########################
+####### FUNCTIONS #######
+#########################
 
 def get_commodity_data(ticker, start_date, end_date):
     """Retrieve historical data for a given commodity ticker."""
@@ -86,9 +85,10 @@ def get_commodities_data(tickers, start_date, end_date):
 
     return pd.concat(dfs, ignore_index=True)
 
-#---------------------------------------------------------
-# Classes
-#---------------------------------------------------------
+##########################
+####### CLASSES #######
+#########################
+
 
 @dataclass
 class DataModule:
@@ -126,7 +126,8 @@ class SpreadStrategy:
         return mean_return, std_dev
 
     def optimize_spread(self, mean_return, std_dev, correlation, margin_limit=1_000_000):
-        """Optimize weights for the spread strategy."""
+        """Optimize weights for the spread strategy.
+        NOT USED"""
         sigma_near = std_dev  # Proxy for near-term volatility
         sigma_long = std_dev * correlation  # Adjusted long-term volatility
 
