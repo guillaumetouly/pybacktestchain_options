@@ -65,7 +65,7 @@ class CommoBroker:
 
         spread = lt_spread - st_spread
         type_of_transac = "None"
-        if commodity in self.positions: #we lookk if we already have positionsi n this commodity because we don't want to get too much exposure
+        if commodity in self.positions: #we look if we already have positionsi n this commodity because we don't want to get too much exposure
 
             position = self.positions[commodity]
             if spread > 0: #we buy short term and sell long term
@@ -197,14 +197,18 @@ class CommoBackTest:
     commodity_pairs: dict
     cash: float = 1000000  # Initial cash in the portfolio
     verbose: bool = True
+    backtest_name: str = ""
     broker = CommoBroker(cash)
     name_blockchain: str = 'backtest'
+    
 
 
 
     def __post_init__(self):
         self.broker = CommoBroker(cash=self.cash, verbose=self.verbose)
-        self.backtest_name = generate_random_name()
+        if self.backtest_name is None:
+            self.backtest_name = generate_random_name()
+        
         self.broker.initialize_blockchain(self.name_blockchain)
 
     def run_backtest(self):
@@ -237,6 +241,7 @@ class CommoBackTest:
         # create backtests folder if it does not exist
         if not os.path.exists('backtests'):
             os.makedirs('backtests')
+
 
         # save to csv, use the backtest name 
         df.to_csv(f"backtests/{self.backtest_name}.csv")
