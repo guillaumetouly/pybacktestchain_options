@@ -31,13 +31,11 @@ class CommoBroker:
     verbose: bool = True
 
     def __post_init__(self):
-        # Initialize positions as a dictionary of SpreadPosition objects
         if self.positions is None:
             self.positions = {}
 
-        # Initialize the transaction log as an empty DataFrame if none is provided
-        if self.transaction_log is None:
-            self.transaction_log = pd.DataFrame(columns=['Date', 'Action', 'Commodity', 'Near Term Qty', 'Long Term Qty', 'Spread', 'Cash'])
+        if self.transaction_log is None: #no transactions already logged, we set up an empty dataframe with all the columns we want
+            self.transaction_log = pd.DataFrame(columns=['Date', 'Action', 'Commodity', 'Near Term Qty', 'Long Term Qty', 'Spread', 'Cash', 'Portfolio Value'])
     
     def initialize_blockchain(self, name: str):
         # Check if the blockchain is already initialized and stored in the blockchain folder
@@ -60,114 +58,86 @@ class CommoBroker:
         if self.verbose:
             logging.info(f"Blockchain with name {name} initialized and stored in the blockchain folder.")
 
-    def buy_st_spread(self, commodity: str, near_qty: int, long_qty: int, st_spread: float, lt_spread: float, date: datetime):
-        """Executes a buy spread order for the specified commodity.
-        We buy st spread and we sell as much as possible long term spread while 
-            keep maintaining the delta hedge"""
-        
-        hedging_ratio = lt_spread / st_spread
-        total_cost = hedging_ratio*st_spread - lt_spread
-        if self.cash >= total_cost:
-            self.cash -= total_cost
-            if commodity in self.positions:
-
-                position = self.positions[commodity]
-                new_near_qty = position.near_term_quantity + hedging_ratio
-                new_long_qty = position.long_term_quantity  - 1
-                new_entry_spread = ((position.entry_spread * abs(position.near_term_quantity - position.long_term_quantity)) + (st_spread * abs(near_qty - long_qty))) / (abs(new_near_qty - new_long_qty))
-                position.near_term_quantity = new_near_qty
-                position.long_term_quantity = new_long_qty
-                position.entry_spread = new_entry_spread
-                self.positions[commodity] = position
-            else:
-                self.positions[commodity] = SpreadPosition(commodity, near_qty, long_qty, st_spread)
-            self.log_transaction(date, 'BUY_SPREAD', commodity, near_qty, long_qty, st_spread)
-        else:
-            if self.verbose:
-                logging.warning(f"Not enough cash to buy spread for {commodity}. Required: {total_cost}, Available: {self.cash}")
-
-    def sell_st_spread(self, commodity: str, near_qty: int, long_qty: int, st_spread: float, lt_spread: float, date: datetime):
-        """Executes a sell spread order for the specified commodity.
-        We sell as much as possible short term and buy as much as possible long term"""
-
-
-        hedging_ratio = st_spread / lt_spread
-        total_cost = hedging_ratio*lt_spread - st_spread #= 0 because we want hedged
-
-        if self.cash >= total_cost:
-            self.cash -= total_cost
-            if commodity in self.positions:
-                position = self.positions[commodity]
-                new_near_qty = position.near_term_quantity - 1
-                new_long_qty = position.long_term_quantity  + hedging_ratio
-                new_entry_spread = ((position.entry_spread * abs(position.near_term_quantity - position.long_term_quantity)) + (st_spread * abs(near_qty - long_qty))) / (abs(new_near_qty - new_long_qty))
-                position.near_term_quantity = new_near_qty
-                position.long_term_quantity = new_long_qty
-                position.entry_spread = new_entry_spread
-                self.positions[commodity] = position
-
-            else:
-                self.positions[commodity] = SpreadPosition(commodity, near_qty, long_qty, st_spread)
-            self.log_transaction(date, 'BUY_SPREAD', commodity, near_qty, long_qty, st_spread)
-        else:
-            if self.verbose:
-                logging.warning(f"Not enough cash to buy spread for {commodity}. Required: {total_cost}, Available: {self.cash}")
-
+ 
     def update_pos(self, commodity: str, near_qty: int, long_qty: int, st_spread: float, lt_spread: float, date: datetime):
-        """Executes a sell spread order for the specified commodity.
-        We sell as much as possible short term and buy as much as possible long term"""
+        """Executes a sell or buy spread order for the specified commodity.
+        We sell as much as possible short term and buy as much as possible long term and conversely for the buy side"""
+
         spread = lt_spread - st_spread
         type_of_transac = "None"
-        if commodity in self.positions:
+        if commodity in self.positions: #we lookk if we already have positionsi n this commodity because we don't want to get too much exposure
+
             position = self.positions[commodity]
             if spread > 0: #we buy short term and sell long term
                 type_of_transac = "Long ST, Short LT"
                 if position.long_term_quantity > spread:
-                    total_cost = spread*(-lt_spread + st_spread)
-                    if total_cost < self.cash:
+                    total_cost = spread*(-lt_spread + st_spread) #we can sell enough LT, this is good because it reduces the transavtion cost for the strategy
+                    if total_cost < self.cash: #else we can't play and we loose this part
                         position.near_term_quantity += spread
                         position.long_term_quantity -= spread
                         self.cash -= total_cost
                 elif position.long_term_quantity > 0:
                     total_cost = - position.long_term_quantity*lt_spread + spread*st_spread #we hedge the maximum we can
-                    if total_cost < self.cash:
+                    if total_cost <= self.cash:
                         self.cash -= total_cost
                         position.near_term_quantity += spread
                         position.long_term_quantity = 0
+                    else:
+                        max_total_cost = - position.long_term_quantity*lt_spread + self.cash
+                        max_position = max_total_cost / st_spread
+                        position.near_term_quantity += max_position
+                        self.cash = 0
+                        position.long_term_quantity = 0
+
                 else:
                     total_cost = spread*st_spread
-                    if total_cost < self.cash:
+                    if total_cost <= self.cash:
                         self.cash -= total_cost
                         position.near_term_quantity += spread
+                    else:
+                        max_position = self.cash / st_spread
+                        position.near_term_quantity += max_position
+                        self.cash = 0
+
             else: #we sell short term and buy long term
                 type_of_transac = "Long LT, Short ST"
                 spread = -spread
                 if position.near_term_quantity > spread:
                     total_cost = spread*(lt_spread - st_spread)
-                    if total_cost < self.cash:
+                    if total_cost <= self.cash:
                         position.near_term_quantity -= spread
                         position.long_term_quantity += spread
                         self.cash -= total_cost
                 elif position.near_term_quantity > 0:
                     total_cost = + position.long_term_quantity*lt_spread - spread*st_spread #we hedge the maximum we can
-                    if total_cost < self.cash:
+                    if total_cost <= self.cash:
                         self.cash -= total_cost
                         position.near_term_quantity = 0
                         position.long_term_quantity += spread
+                    else:
+                        max_total_cost = - position.near_term_quantity*st_spread + self.cash
+                        max_position = max_total_cost / lt_spread
+                        position.long_term_quantity += max_position
+                        self.cash = 0
+                        position.near_term_quantity = 0
                 else:
                     total_cost = spread*lt_spread
-                    if total_cost < self.cash:
+                    if total_cost <= self.cash:
                         self.cash -= total_cost
                         position.long_term_quantity += spread
+                    else:
+                        max_position = self.cash / lt_spread
+                        position.long_term_quantity += max_position
+                        self.cash = 0
             self.positions[commodity] = position
-            self.log_transaction(date, type_of_transac, commodity, position.near_term_quantity, position.long_term_quantity, st_spread)
+            self.log_transaction(date, type_of_transac, commodity, position.near_term_quantity, position.long_term_quantity, st_spread, 1)
 
         else:
             self.positions[commodity] = SpreadPosition(commodity, near_qty, long_qty, st_spread)
 
 
 
-    def log_transaction(self, date, action, commodity, near_qty, long_qty, spread):
+    def log_transaction(self, date, action, commodity, near_qty, long_qty, spread, portfolio_value):
         """Logs the transaction."""
         transaction = pd.DataFrame([{
             'Date': date,
@@ -176,7 +146,8 @@ class CommoBroker:
             'Near Term Qty': near_qty,
             'Long Term Qty': long_qty,
             'Spread': spread,
-            'Cash': self.cash
+            'Cash': self.cash,
+            "Portfolio Value": portfolio_value
         }])
 
         self.transaction_log = pd.concat([self.transaction_log, transaction], ignore_index=True)
@@ -213,7 +184,6 @@ class CommoBroker:
                     logging.warning(f"Spread for {commodity} not available on {date}")
                 continue
 
-            # Determine the quantity to trade based on the target spread
             self.update_pos(commodity, 1, 1, long_term_spread[1], long_term_spread[0], date)
             
 
@@ -255,9 +225,6 @@ class CommoBackTest:
             short_term_spreads = 1
             # short_term_spreads = {commodity : data.loc[t.strftime('%Y-%m-%d')][commodity+ " - Long Term"] if t.strftime('%Y-%m-%d') in spread_data.index else {} for commodity in commo}
             self.broker.execute_spread_strategy(long_term_spreads, short_term_spreads, t)
-        time = pd.date_range(start=self.initial_date, end=self.final_date, freq='B').max()
-        #dico = {commodity: [spread_data.loc[time.strftime('%Y-%m-%d')][commodity+ " - Near Term"] if time.strftime('%Y-%m-%d') in spread_data.index else {},
-        #                    spread_data.loc[time.strftime('%Y-%m-%d')][commodity+ " - Long Term"] if time.strftime('%Y-%m-%d') in spread_data.index else {}] for commodity in commo}
 
         logging.info(f"Backtest completed. Final portfolio value: {self.broker.get_portfolio_value(dico)}")
         logging.info("Transaction Log:")
